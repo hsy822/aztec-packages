@@ -171,7 +171,7 @@ if ! handle_network_shaping; then
 fi
 
 # Get the values from the values file
-VALUES=$(cat "$VALUES_PATH")
+VALUES=$(helm get values -n "$NAMESPACE" spartan --all -o json)
 ETHEREUM_SLOT_DURATION=$(yq -r '.ethereum.blockTime' <<<"$VALUES")
 AZTEC_SLOT_DURATION=$(yq -r '.aztec.slotDuration' <<<"$VALUES")
 AZTEC_EPOCH_DURATION=$(yq -r '.aztec.epochDuration' <<<"$VALUES")
