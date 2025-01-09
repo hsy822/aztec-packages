@@ -152,7 +152,7 @@ FREE_PORTS=$(comm -23 <(seq 9000 10000 | sort) <(ss -Htan | awk '{print $4}' | c
 
 # Extract the free ports from the list
 export HOST_PXE_PORT=$(echo $FREE_PORTS | awk '{print $1}')
-export HOST_ANVIL_PORT=$(echo $FREE_PORTS | awk '{print $2}')
+export HOST_ETHEREUM_PORT=$(echo $FREE_PORTS | awk '{print $2}')
 export HOST_METRICS_PORT=$(echo $FREE_PORTS | awk '{print $3}')
 
 export GRAFANA_PASSWORD=$(kubectl get secrets -n metrics metrics-grafana -o jsonpath='{.data.admin-password}' | base64 --decode)
@@ -182,7 +182,7 @@ export CONTAINER_PXE_PORT=$(jq -r '.pxe.service.nodePort' <<< $HELM_VALUES)
 export CONTAINER_ETHEREUM_PORT=$(jq -r '.ethereum.service.port' <<< $HELM_VALUES)
 export CONTAINER_METRICS_PORT=80
 
-export LOG_LEVEL="${LOG_LEVEL:-'debug; info: aztec:simulator, json-rpc'}"
+export LOG_LEVEL="${LOG_LEVEL:-"debug; info: aztec:simulator, json-rpc"}"
 
 
 # Run the test if $TEST is not empty

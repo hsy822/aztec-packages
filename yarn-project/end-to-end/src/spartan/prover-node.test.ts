@@ -25,33 +25,25 @@ const logger = createLogger('e2e:spartan-test:prover-node');
  * unique inputs for each txs so jobs will only get cached after crash recovery.
  * We could also use the tube proof for this, but in a simulated network, all tube proof jobs take the same input proof: the empty private kernel proof.
  */
-const PROOF_TYPE = '"PUBLIC_BASE_ROLLLUP"'; // note: double quotes!
-const interval = '1m';
 const cachedBaseRollupJobs = {
   alert: 'CachedBaseRollupRate',
-  expr: `rate(aztec_proving_queue_cached_jobs{aztec_proving_job_type=${PROOF_TYPE}}[${interval}])>0`,
+  // or (...) captures the initial surge in cached jobs
+  expr: `(rate(aztec_proving_queue_cached_jobs{aztec_proving_job_type="PUBLIC_BASE_ROLLUP"}[1m]) or (aztec_proving_queue_cached_jobs{aztec_proving_job_type="PUBLIC_BASE_ROLLUP"} > bool 0)) > 0`,
   labels: { severity: 'error' },
-  for: interval,
+  for: '1m',
   annotations: {},
 };
 
 const newBaseRollupJobs: AlertConfig = {
   alert: 'NewBaseRollupJobs',
-  expr: `rate(aztec_proving_queue_total_jobs{aztec_proving_job_type=${PROOF_TYPE}}[${interval}])>0`,
+  expr: `rate(aztec_proving_queue_enqueued_jobs_count{aztec_proving_job_type="PUBLIC_BASE_ROLLUP"}[1m])>0`,
   labels: { severity: 'error' },
-  for: interval,
+  for: '1m',
   annotations: {},
 };
 
 describe('prover node recovery', () => {
   beforeAll(async () => {
-    await startPortForward({
-      resource: `svc/${config.INSTANCE_NAME}-aztec-network-prover-node`,
-      namespace: config.NAMESPACE,
-      containerPort: config.CONTAINER_PROVER_NODE_PORT,
-      hostPort: config.HOST_PROVER_NODE_PORT,
-    });
-
     await startPortForward({
       resource: `svc/metrics-grafana`,
       namespace: 'metrics',
