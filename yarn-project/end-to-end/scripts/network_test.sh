@@ -16,6 +16,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # Main positional parameter
 TEST=${1:-}
+SUBTEST=${2:-''}
 
 REPO=$(git rev-parse --show-toplevel)
 if [ "$(uname)" = "Linux" ] && [ "$(uname -m)" = "x86_64" ]; then
@@ -178,8 +179,8 @@ export AZTEC_SLOT_DURATION=$(yq -r '.aztec.slotDuration' <<<"$VALUES")
 export AZTEC_EPOCH_DURATION=$(yq -r '.aztec.epochDuration' <<<"$VALUES")
 export AZTEC_EPOCH_PROOF_CLAIM_WINDOW_IN_L2_SLOTS=$(yq -r '.aztec.epochProofClaimWindow' <<<"$VALUES")
 
-export CONTAINER_PXE_PORT=$(jq -r '.pxe.service.nodePort' <<< $HELM_VALUES)
-export CONTAINER_ETHEREUM_PORT=$(jq -r '.ethereum.service.port' <<< $HELM_VALUES)
+export CONTAINER_PXE_PORT=$(jq -r '.pxe.service.nodePort' <<< $VALUES)
+export CONTAINER_ETHEREUM_PORT=$(jq -r '.ethereum.service.port' <<< $VALUES)
 export CONTAINER_METRICS_PORT=80
 
 export LOG_LEVEL="${LOG_LEVEL:-"debug; info: aztec:simulator, json-rpc"}"
@@ -209,12 +210,12 @@ if [ -n "$TEST" ]; then
       -e AZTEC_SLOT_DURATION \
       -e AZTEC_EPOCH_DURATION \
       -e AZTEC_EPOCH_PROOF_CLAIM_WINDOW_IN_L2_SLOTS \
-      aztecprotocol/end-to-end:$AZTEC_DOCKER_TAG $TEST
+      aztecprotocol/end-to-end:$AZTEC_DOCKER_TAG $TEST -t $SUBTEST
   else
     export K8S=local
     export INSTANCE_NAME=spartan
     export SPARTAN_DIR=$(realpath "$SCRIPT_DIR/../../../spartan")
     export NODE_OPTIONS="${NODE_OPTIONS:-""} --no-warnings --experimental-vm-modules"
-    yarn jest $TEST
+    yarn jest $TEST -t $SUBTEST
   fi
 fi

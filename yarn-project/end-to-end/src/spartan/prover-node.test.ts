@@ -1,8 +1,18 @@
-import { retryUntil, sleep } from '@aztec/aztec.js';
+import { PXE, createPXEClient, retryUntil, sleep } from '@aztec/aztec.js';
+import { RollupCheatCodes } from '@aztec/aztec.js/utils';
+import { EthCheatCodesWithState } from '@aztec/ethereum/test';
 import { createLogger } from '@aztec/foundation/log';
 
 import { type AlertConfig } from '../quality_of_service/alert_checker.js';
-import { applyProverKill, isK8sConfig, runAlertCheck, setupEnvironment, startPortForward } from './utils.js';
+import {
+  applyProverBrokerKill,
+  applyProverKill,
+  awaitProvenChainAdance,
+  isK8sConfig,
+  runAlertCheck,
+  setupEnvironment,
+  startPortForward,
+} from './utils.js';
 
 const config = setupEnvironment(process.env);
 if (!isK8sConfig(config)) {
@@ -43,16 +53,35 @@ const newBaseRollupJobs: AlertConfig = {
 };
 
 describe('prover node recovery', () => {
+  let PXE_URL: string;
+  let ETHEREUM_HOST: string;
+  let pxe: PXE;
   beforeAll(async () => {
+    await startPortForward({
+      resource: `svc/${config.INSTANCE_NAME}-aztec-network-pxe`,
+      namespace: config.NAMESPACE,
+      containerPort: config.CONTAINER_PXE_PORT,
+      hostPort: config.HOST_PXE_PORT,
+    });
+    await startPortForward({
+      resource: `svc/${config.INSTANCE_NAME}-aztec-network-ethereum`,
+      namespace: config.NAMESPACE,
+      containerPort: config.CONTAINER_ETHEREUM_PORT,
+      hostPort: config.HOST_ETHEREUM_PORT,
+    });
+    PXE_URL = `http://127.0.0.1:${config.HOST_PXE_PORT}`;
+    ETHEREUM_HOST = `http://127.0.0.1:${config.HOST_ETHEREUM_PORT}`;
     await startPortForward({
       resource: `svc/metrics-grafana`,
       namespace: 'metrics',
       containerPort: config.CONTAINER_METRICS_PORT,
       hostPort: config.HOST_METRICS_PORT,
     });
+
+    pxe = createPXEClient(PXE_URL);
   });
 
-  it('should start proving', async () => {
+  it('should recover after a crash', async () => {
     logger.info(`Waiting for base rollups to be submitted`);
 
     // use the alert checker to wait until grafana picks up a proof has started
@@ -83,4 +112,37 @@ describe('prover node recovery', () => {
     // assert that jobs have been cached
     await expect(runAlertCheck(config, [cachedBaseRollupJobs], logger)).rejects.toBeDefined();
   }, 1_800_000);
+
+  it('should recover after a broker crash', async () => {
+    logger.info(`Waiting for base rollups to be submitted`);
+
+    // use the alert checker to wait until grafana picks up a proof has started
+    await retryUntil(
+      async () => {
+        try {
+          await runAlertCheck(config, [newBaseRollupJobs], logger);
+        } catch {
+          return true;
+        }
+      },
+      'wait for base rollups',
+      600,
+      5,
+    );
+
+    logger.info(`Detected base rollups. Killing the broker`);
+
+    await applyProverBrokerKill({
+      namespace: config.NAMESPACE,
+      spartanDir: config.SPARTAN_DIR,
+      logger,
+    });
+
+    const rollupCheatCodes = new RollupCheatCodes(
+      new EthCheatCodesWithState(ETHEREUM_HOST),
+      await pxe.getNodeInfo().then(n => n.l1ContractAddresses),
+    );
+
+    await expect(awaitProvenChainAdance(rollupCheatCodes, 1800, logger)).resolves.toEqual(true);
+  });
 });
