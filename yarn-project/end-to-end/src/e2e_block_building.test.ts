@@ -29,7 +29,7 @@ import { type TestDateProvider } from '@aztec/foundation/timer';
 import { StatefulTestContract, StatefulTestContractArtifact } from '@aztec/noir-contracts.js/StatefulTest';
 import { TestContract } from '@aztec/noir-contracts.js/Test';
 import { TokenContract } from '@aztec/noir-contracts.js/Token';
-import { type SequencerClient, SequencerState } from '@aztec/sequencer-client';
+import { type SequencerClient } from '@aztec/sequencer-client';
 import { type TestSequencerClient } from '@aztec/sequencer-client/test';
 import {
   PublicProcessorFactory,
@@ -38,7 +38,6 @@ import {
   type WorldStateDB,
 } from '@aztec/simulator/server';
 import { type TelemetryClient } from '@aztec/telemetry-client';
-import { NoopTelemetryClient } from '@aztec/telemetry-client/noop';
 
 import { jest } from '@jest/globals';
 import 'jest-extended';
@@ -60,6 +59,10 @@ describe('e2e_block_building', () => {
   let teardown: () => Promise<void>;
 
   const { aztecEpochProofClaimWindowInL2Slots } = getL1ContractsConfigEnvVars();
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
 
   describe('multi-txs block', () => {
     const artifact = StatefulTestContractArtifact;
@@ -200,21 +203,15 @@ describe('e2e_block_building', () => {
 
       // We tweak the sequencer so it uses a fake simulator that adds a delay to every public tx.
       const archiver = (aztecNode as AztecNodeService).getContractDataSource();
-      sequencer.sequencer.publicProcessorFactory = new TestPublicProcessorFactory(
-        archiver,
-        dateProvider!,
-        new NoopTelemetryClient(),
-      );
+      sequencer.sequencer.publicProcessorFactory = new TestPublicProcessorFactory(archiver, dateProvider!);
 
       // We also cheat the sequencer's timetable so it allocates little time to processing.
       // This will leave the sequencer with just a few seconds to build the block, so it shouldn't
       // be able to squeeze in more than ~12 txs in each. This is sensitive to the time it takes
-      // to pick up and validate the txs, so we may need to bump it to work on CI. Note that we need
-      // at least 3s here so the archiver has time to loop once and sync, and the sequencer has at
-      // least 1s to loop.
-      sequencer.sequencer.timeTable[SequencerState.INITIALIZING_PROPOSAL] = 4;
-      sequencer.sequencer.timeTable[SequencerState.CREATING_BLOCK] = 4;
-      sequencer.sequencer.processTxTime = 1;
+      // to pick up and validate the txs, so we may need to bump it to work on CI.
+      jest
+        .spyOn(sequencer.sequencer.timetable, 'getBlockProposalExecTimeEnd')
+        .mockImplementation((secondsIntoSlot: number) => secondsIntoSlot + 1);
 
       // Flood the mempool with TX_COUNT simultaneous txs
       const methods = times(TX_COUNT, i => contract.methods.increment_public_value(ownerAddress, i));
@@ -627,18 +624,18 @@ class TestPublicProcessorFactory extends PublicProcessorFactory {
   protected override createPublicTxSimulator(
     db: MerkleTreeWriteOperations,
     worldStateDB: WorldStateDB,
-    telemetryClient: TelemetryClient,
     globalVariables: GlobalVariables,
     doMerkleOperations: boolean,
     enforceFeePayment: boolean,
+    telemetryClient?: TelemetryClient,
   ): PublicTxSimulator {
     return new TestPublicTxSimulator(
       db,
       worldStateDB,
-      telemetryClient,
       globalVariables,
       doMerkleOperations,
       enforceFeePayment,
+      telemetryClient,
     );
   }
 }
