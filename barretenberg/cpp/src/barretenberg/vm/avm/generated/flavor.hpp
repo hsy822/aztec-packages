@@ -12,6 +12,7 @@
 #include "barretenberg/polynomials/evaluation_domain.hpp"
 #include "barretenberg/transcript/transcript.hpp"
 
+#include "barretenberg/vm/avm/tuplet.hpp"
 #include "barretenberg/vm/aztec_constants.hpp"
 #include "columns.hpp"
 #include "flavor_settings.hpp"
@@ -216,10 +217,10 @@ class AvmFlavor {
 
         DEFINE_FLAVOR_MEMBERS(DataType, AVM_PRECOMPUTED_ENTITIES)
 
-        RefVector<DataType> get_selectors() { return get_all(); }
-        RefVector<DataType> get_sigma_polynomials() { return {}; }
-        RefVector<DataType> get_id_polynomials() { return {}; }
-        RefVector<DataType> get_table_polynomials() { return {}; }
+        // RefVector<DataType> get_selectors() { return get_all(); }
+        // RefVector<DataType> get_sigma_polynomials() { return {}; }
+        // RefVector<DataType> get_id_polynomials() { return {}; }
+        // RefVector<DataType> get_table_polynomials() { return {}; }
     };
 
   private:
@@ -255,26 +256,42 @@ class AvmFlavor {
         auto get_derived_labels() { return DerivedWitnessEntities<DataType>::get_labels(); }
     };
 
-    template <typename DataType>
-    class AllEntities : public PrecomputedEntities<DataType>,
-                        public WitnessEntities<DataType>,
-                        public ShiftedEntities<DataType> {
+    template <typename DataType> class AllEntities {
       public:
-        DEFINE_COMPOUND_GET_ALL(PrecomputedEntities<DataType>, WitnessEntities<DataType>, ShiftedEntities<DataType>)
+        DEFINE_FLAVOR_GROUP_MEMBERS(DataType, precomputed, AVM_PRECOMPUTED_ENTITIES);
+        DEFINE_FLAVOR_GROUP_MEMBERS(DataType, wires, AVM_WIRE_ENTITIES);
+        DEFINE_FLAVOR_GROUP_MEMBERS(DataType, derived, AVM_DERIVED_WITNESS_ENTITIES);
+        DEFINE_FLAVOR_GROUP_MEMBERS(DataType, shifted, AVM_SHIFTED_ENTITIES);
+        DEFINE_FLAVOR_GROUP_METHODS(DataType, all, AVM_ALL_ENTITIES);
 
-        auto get_unshifted()
+        const auto& get_labels() { return get_all_labels(); }
+        auto get_witness() { return concatenate(get_wires(), get_derived()); }
+        const auto& get_witness_labels()
         {
-            return concatenate(PrecomputedEntities<DataType>::get_all(), WitnessEntities<DataType>::get_all());
+            static const std::vector<std::string> labels = concatenate(get_wires_labels(), get_derived_labels());
+            return labels;
         }
-
-        auto get_unshifted_labels()
-        {
-            return concatenate(PrecomputedEntities<DataType>::get_labels(), WitnessEntities<DataType>::get_labels());
-        }
-
+        auto get_unshifted() { return concatenate(get_precomputed(), get_witness()); }
         auto get_to_be_shifted() { return AvmFlavor::get_to_be_shifted<DataType>(*this); }
-        auto get_shifted() { return ShiftedEntities<DataType>::get_all(); }
-        auto get_precomputed() { return PrecomputedEntities<DataType>::get_all(); }
+
+        const auto& get_unshifted_labels()
+        {
+            static const std::vector<std::string> labels = concatenate(get_precomputed_labels(), get_witness_labels());
+            return labels;
+        }
+
+        // template <ColumnAndShifts col> auto& get_column() const
+        // {
+        //     constexpr size_t col_idx = static_cast<size_t>(col);
+        //     static_assert(col_idx < NUM_ALL_ENTITIES, "Column index out of bounds");
+        //     return tuplet::get<col_idx>(tuplet::tie(AVM_ALL_ENTITIES));
+        // }
+        // template <ColumnAndShifts col> auto& get_column()
+        // {
+        //     constexpr size_t col_idx = static_cast<size_t>(col);
+        //     static_assert(col_idx < NUM_ALL_ENTITIES, "Column index out of bounds");
+        //     return tuplet::get<col_idx>(tuplet::tie(AVM_ALL_ENTITIES));
+        // }
     };
 
     class ProvingKey : public PrecomputedEntities<Polynomial>, public WitnessEntities<Polynomial> {
@@ -339,20 +356,23 @@ class AvmFlavor {
         std::vector<FF> to_field_elements() const;
     };
 
-    class AllValues : public AllEntities<FF> {
-      public:
-        using Base = AllEntities<FF>;
-        using Base::Base;
-    };
+    using AllValues = AllEntities<FF>;
+    // class AllValues : public AllEntities<FF> {
+    //   public:
+    //     using Base = AllEntities<FF>;
+    //     using Base::Base;
+    // };
 
-    class AllConstRefValues {
-      public:
-        using BaseDataType = const FF;
-        using DataType = BaseDataType&;
+    using AllConstRefValues = AllEntities<const FF&>;
+    // class AllConstRefValues {
+    //   public:
+    //     using BaseDataType = const FF;
+    //     using DataType = BaseDataType&;
 
-        DEFINE_FLAVOR_MEMBERS(DataType, AVM_ALL_ENTITIES)
-    };
+    //     DEFINE_FLAVOR_MEMBERS(DataType, AVM_ALL_ENTITIES)
+    // };
 
+    class RowProxy;
     /**
      * @brief A container for the prover polynomials handles.
      */
@@ -369,12 +389,42 @@ class AvmFlavor {
         ProverPolynomials(ProvingKey& proving_key);
 
         size_t get_polynomial_size() const { return main_kernel_inputs.size(); }
-        AllConstRefValues get_row(size_t row_idx) const
+        // AllConstRefValues get_row(size_t row_idx) const
+        // {
+        //     return [row_idx](auto&... entities) -> AllConstRefValues {
+        //         return { entities[row_idx]... };
+        //     }(AVM_ALL_ENTITIES);
+        // }
+        auto get_row(size_t row_idx) const { return RowProxy(*this, row_idx); }
+        auto get_full_row(size_t row_idx) const
         {
             return [row_idx](auto&... entities) -> AllConstRefValues {
                 return { entities[row_idx]... };
             }(AVM_ALL_ENTITIES);
         }
+    };
+
+    class RowProxy {
+      public:
+        RowProxy(const ProverPolynomials& pp, size_t row_idx)
+            : pp(pp)
+            , row_idx(row_idx)
+        {}
+
+// template <ColumnAndShifts col> auto& get_column() const { return pp.template get_column<col>()[row_idx]; }
+// template <ColumnAndShifts col> auto& get_column()
+// {
+//     return pp.template get_column<col>()[row_idx];
+// }
+#define GGG(ent)                                                                                                       \
+    inline auto& get_##ent() { return pp.ent[row_idx]; }                                                               \
+    inline auto& get_##ent() const { return pp.ent[row_idx]; }
+
+        FOR_EACH(GGG, AVM_ALL_ENTITIES);
+
+      private:
+        const ProverPolynomials& pp;
+        const size_t row_idx;
     };
 
     class PartiallyEvaluatedMultivariates : public AllEntities<Polynomial> {
@@ -407,6 +457,14 @@ class AvmFlavor {
      *
      */
     using WitnessCommitments = WitnessEntities<Commitment>;
+
+    class CommitmentLabels : public AllEntities<std::string> {
+      private:
+        using Base = AllEntities<std::string>;
+
+      public:
+        CommitmentLabels();
+    };
 
     // Templated for use in recursive verifier
     template <typename Commitment_, typename VerificationKey>

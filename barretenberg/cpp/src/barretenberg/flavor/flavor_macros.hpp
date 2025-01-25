@@ -44,6 +44,20 @@ template <typename T, typename... BaseClass> auto _concatenate_base_class_get_la
 // Needed to force expansion of __VA_ARGS__ before converting to string.
 #define VARARGS_TO_STRING(...) #__VA_ARGS__
 
+#define PARENS ()
+
+// If something starts failing when adding columns, add another layer here.
+#define EXPAND(...) EXPAND5(EXPAND5(EXPAND5(EXPAND5(__VA_ARGS__))))
+#define EXPAND5(...) EXPAND4(EXPAND4(EXPAND4(EXPAND4(__VA_ARGS__))))
+#define EXPAND4(...) EXPAND3(EXPAND3(EXPAND3(EXPAND3(__VA_ARGS__))))
+#define EXPAND3(...) EXPAND2(EXPAND2(EXPAND2(EXPAND2(__VA_ARGS__))))
+#define EXPAND2(...) EXPAND1(EXPAND1(EXPAND1(EXPAND1(__VA_ARGS__))))
+#define EXPAND1(...) __VA_ARGS__
+
+#define FOR_EACH(macro, ...) __VA_OPT__(EXPAND(FOR_EACH_HELPER(macro, __VA_ARGS__)))
+#define FOR_EACH_HELPER(macro, a1, ...) macro(a1) __VA_OPT__(FOR_EACH_AGAIN PARENS(macro, __VA_ARGS__))
+#define FOR_EACH_AGAIN() FOR_EACH_HELPER
+
 // We use std::remove_reference to support a flavor that has references as members. This is an AVM use case.
 #define DEFINE_REF_VIEW(...)                                                                                           \
     [[nodiscard]] auto get_all()                                                                                       \
@@ -55,6 +69,16 @@ template <typename T, typename... BaseClass> auto _concatenate_base_class_get_la
         return RefArray<const std::remove_reference_t<DataType>, _members_size>{ __VA_ARGS__ };                        \
     }
 
+#define F(entity)                                                                                                      \
+    inline auto& get_##entity()                                                                                        \
+    {                                                                                                                  \
+        return entity;                                                                                                 \
+    }                                                                                                                  \
+    inline auto& get_##entity() const                                                                                  \
+    {                                                                                                                  \
+        return entity;                                                                                                 \
+    }
+
 /**
  * @brief Define the body of a flavor class, included each member and a pointer view with which to iterate the struct.
  *
@@ -64,6 +88,7 @@ template <typename T, typename... BaseClass> auto _concatenate_base_class_get_la
  */
 #define DEFINE_FLAVOR_MEMBERS(DataType, ...)                                                                           \
     __VA_OPT__(DataType __VA_ARGS__;)                                                                                  \
+    FOR_EACH(F, __VA_ARGS__)                                                                                           \
     static constexpr size_t _members_size = std::tuple_size<decltype(std::make_tuple(__VA_ARGS__))>::value;            \
     DEFINE_REF_VIEW(__VA_ARGS__)                                                                                       \
     static const std::vector<std::string>& get_labels()                                                                \
@@ -94,3 +119,26 @@ template <typename T, typename... BaseClass> auto _concatenate_base_class_get_la
     {                                                                                                                  \
         return bb::detail::_concatenate_base_class_get_labels<decltype(*this), __VA_ARGS__>(*this);                    \
     }
+
+#define DEFINE_FLAVOR_GROUP_METHODS(DataType, group_name, ...)                                                         \
+    static constexpr size_t _##group_name##_members_size =                                                             \
+        std::tuple_size<decltype(std::make_tuple(__VA_ARGS__))>::value;                                                \
+    [[nodiscard]] auto get_##group_name()                                                                              \
+    {                                                                                                                  \
+        return RefArray<std::remove_reference_t<DataType>, _##group_name##_members_size>{ __VA_ARGS__ };               \
+    }                                                                                                                  \
+    [[nodiscard]] auto get_##group_name() const                                                                        \
+    {                                                                                                                  \
+        return RefArray<const std::remove_reference_t<DataType>, _##group_name##_members_size>{ __VA_ARGS__ };         \
+    }                                                                                                                  \
+    static const std::vector<std::string>& get_##group_name##_labels()                                                 \
+    {                                                                                                                  \
+        static const std::vector<std::string> labels =                                                                 \
+            bb::detail::split_and_trim(VARARGS_TO_STRING(__VA_ARGS__), ',');                                           \
+        return labels;                                                                                                 \
+    }
+
+#define DEFINE_FLAVOR_GROUP_MEMBERS(DataType, group_name, ...)                                                         \
+    __VA_OPT__(DataType __VA_ARGS__;)                                                                                  \
+    FOR_EACH(F, __VA_ARGS__)                                                                                           \
+    DEFINE_FLAVOR_GROUP_METHODS(DataType, group_name, __VA_ARGS__);
