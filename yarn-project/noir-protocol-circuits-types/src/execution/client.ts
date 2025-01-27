@@ -84,7 +84,15 @@ export function convertPrivateKernelInnerInputsToWitnessMapWithAbi(
     ),
   };
   pushTestData('private-kernel-inner', mapped);
+  // console.log('INNER ABI', privateKernelInnerAbi);
+  //console.log('INNER MAPPED', mapped);
+  // console.log(
+  //   'INNER MAPPED',
+  //   JSON.stringify(mapped, (_, v) => (typeof v === 'bigint' ? v.toString() : v)),
+  // );
   const initialWitnessMap = abiEncode(privateKernelInnerAbi, mapped);
+  // This would show up as `{}` with `JSON.stringify`:
+  // console.log('INNER WITNESS', initialWitnessMap);
   return initialWitnessMap;
 }
 
