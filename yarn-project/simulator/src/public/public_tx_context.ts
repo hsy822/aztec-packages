@@ -163,7 +163,7 @@ export class PublicTxContext {
    * NOTE: this does not "halt" the entire transaction execution.
    */
   revert(phase: TxExecutionPhase, revertReason: SimulationError | undefined = undefined, culprit = '') {
-    this.log.debug(`${TxExecutionPhase[phase]} phase reverted! ${culprit} failed with reason: ${revertReason}`);
+    this.log.warn(`${TxExecutionPhase[phase]} phase reverted! ${culprit} failed with reason: ${revertReason}`);
 
     if (revertReason && !this.revertReason) {
       // don't override revertReason
@@ -171,7 +171,7 @@ export class PublicTxContext {
       this.revertReason = revertReason;
     }
     if (phase === TxExecutionPhase.SETUP) {
-      this.log.debug(`Setup phase reverted! The transaction will be thrown out.`);
+      this.log.warn(`Setup phase reverted! The transaction will be thrown out.`);
       if (revertReason) {
         throw revertReason;
       } else {
