@@ -1,6 +1,5 @@
 import {
   ContractClassTxL2Logs,
-  IndexedTreeId,
   MerkleTreeId,
   type MerkleTreeReadOperations,
   type MerkleTreeWriteOperations,
@@ -25,31 +24,12 @@ import {
 import { computeL1ToL2MessageNullifier, computePublicDataTreeLeafSlot } from '@aztec/circuits.js/hash';
 import { createLogger } from '@aztec/foundation/log';
 import { Timer } from '@aztec/foundation/timer';
-import { type IndexedTreeLeafPreimage, type TreeLeafPreimage } from '@aztec/foundation/trees';
 import { ContractClassRegisteredEvent } from '@aztec/protocol-contracts/class-registerer';
 import { ContractInstanceDeployedEvent } from '@aztec/protocol-contracts/instance-deployer';
-
-import { strict as assert } from 'assert';
-import cloneDeep from 'lodash.clonedeep';
 
 import { MessageLoadOracleInputs } from '../common/message_load_oracle_inputs.js';
 import { type CommitmentsDB, type PublicContractsDB, type PublicStateDB } from './db_interfaces.js';
 
-/**
- * The preimage and the leaf index of the Low Leaf (Low Nullifier or Low Public Data Leaf)
- */
-type PreimageWitness<T extends IndexedTreeLeafPreimage> = {
-  preimage: T;
-  leafIndex: bigint;
-};
-
-/**
- * The result of fetching a leaf from an indexed tree. Contains the preimage and wether the leaf was already present
- * or it's a low leaf.
- */
-type GetLeafResult<T extends IndexedTreeLeafPreimage> = PreimageWitness<T> & {
-  alreadyPresent: boolean;
-};
 /**
  * Implements the PublicContractsDB using a ContractDataSource.
  * Progressively records contracts in transaction as they are processed in a block.
@@ -233,37 +213,8 @@ export class WorldStateDB extends ContractsDataSourcePublicDB implements PublicS
   public async storageWrite(contract: AztecAddress, slot: Fr, newValue: Fr): Promise<void> {
     const leafSlot = await computePublicDataTreeLeafSlot(contract, slot);
     const publicDataWrite = new PublicDataWrite(leafSlot, newValue);
-
-    //const treeId = MerkleTreeId.PUBLIC_DATA_TREE;
-    //const { preimage, leafIndex, alreadyPresent } = await this._getLeafOrLowLeafInfo<typeof treeId, PublicDataTreeLeafPreimage>(treeId, leafSlot);
-    //const siblingPath = await this.db.getSiblingPath(treeId, leafIndex);
-    //if (alreadyPresent) {
-    //  const updatedPreimage = cloneDeep(preimage);
-    //  updatedPreimage.value = newValue;
-
-    //}
     await this.db.sequentialInsert(MerkleTreeId.PUBLIC_DATA_TREE, [publicDataWrite.toBuffer()]);
   }
-  //private async _getLeafOrLowLeafInfo<ID extends IndexedTreeId, T extends IndexedTreeLeafPreimage>(
-  //  treeId: ID,
-  //  key: bigint,
-  //): Promise<GetLeafResult<T>> {
-  //  // "key" is siloed slot (leafSlot) or siloed nullifier
-  //  const previousValueIndex = await this.db.getPreviousValueIndex(treeId, key);
-  //  assert(
-  //    previousValueIndex !== undefined,
-  //    `${MerkleTreeId[treeId]} low leaf index should always be found (even if target leaf does not exist)`,
-  //  );
-  //  const { index: leafIndex, alreadyPresent } = previousValueIndex;
-
-  //  const leafPreimage = await this.db.getLeafPreimage(treeId, leafIndex);
-  //  assert(
-  //    leafPreimage !== undefined,
-  //    `${MerkleTreeId[treeId]}  low leaf preimage should never be undefined (even if target leaf does not exist)`,
-  //  );
-
-  //  return { preimage: leafPreimage as T, leafIndex, alreadyPresent };
-  //}
 
   public async getNullifierMembershipWitnessAtLatestBlock(
     siloedNullifier: Fr,

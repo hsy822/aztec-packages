@@ -2,7 +2,7 @@ import { MerkleTreeId, type MerkleTreeWriteOperations } from '@aztec/circuit-typ
 import {
   DEPLOYER_CONTRACT_ADDRESS,
   GasFees,
-  NullifierLeafPreimage,
+  type NullifierLeafPreimage,
   PublicDataTreeLeafPreimage,
   PublicDataWrite,
   PublicKeys,

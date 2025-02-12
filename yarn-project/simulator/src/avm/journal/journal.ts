@@ -1,4 +1,4 @@
-import { IndexedTreeId, MerkleTreeId, MerkleTreeWriteOperations } from '@aztec/circuit-types';
+import { type IndexedTreeId, MerkleTreeId, type MerkleTreeWriteOperations } from '@aztec/circuit-types';
 import {
   AztecAddress,
   CANONICAL_AUTH_REGISTRY_ADDRESS,
@@ -23,7 +23,7 @@ import {
 import { Fr } from '@aztec/foundation/fields';
 import { jsonStringify } from '@aztec/foundation/json-rpc';
 import { createLogger } from '@aztec/foundation/log';
-import { IndexedTreeLeafPreimage } from '@aztec/foundation/trees';
+import { type IndexedTreeLeafPreimage } from '@aztec/foundation/trees';
 
 import { strict as assert } from 'assert';
 import cloneDeep from 'lodash.clonedeep';
@@ -103,7 +103,7 @@ export class AvmPersistableStateManager {
   }
 
   public async getTreeInfo(treeId: MerkleTreeId) {
-    return this.db.getTreeInfo(treeId);
+    return await this.db.getTreeInfo(treeId);
   }
 
   /**
