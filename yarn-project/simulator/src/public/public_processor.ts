@@ -223,6 +223,7 @@ export class PublicProcessor implements Traceable {
       }
 
       try {
+        await this.worldStateDB.createCheckpoint();
         const [processedTx, returnValues] = await this.processTx(tx, deadline);
 
         // If the actual size of this tx would exceed block size, skip it
@@ -246,9 +247,11 @@ export class PublicProcessor implements Traceable {
           // TODO(palla/txs): Can we get into this case? AVM validates this. We should be able to remove it.
           const result = await postprocessValidator.validateTx(processedTx);
           if (result.result !== 'valid') {
+            // TODO: revert checkpoint here?
             const reason = result.reason.join(', ');
             this.log.error(`Rejecting tx ${processedTx.hash} after processing: ${reason}.`);
             failed.push({ tx, error: new Error(`Tx failed post-process validation: ${reason}`) });
+            await this.worldStateDB.revertCheckpoint();
             continue;
           } else {
             this.log.trace(`Tx ${(await tx.getTxHash()).toString()} is valid post processing.`);
@@ -256,7 +259,13 @@ export class PublicProcessor implements Traceable {
         }
 
         // Otherwise, commit tx state for the next tx to be processed
-        await this.commitTxState(processedTx);
+        if (tx.hasPublicCalls()) {
+          // If has public calls, just commit the state updates performed by the AVM
+          await this.worldStateDB.commitCheckpoint();
+        } else {
+          // Otherwise, perform all tree insertions for side effects from private
+          await this.commitTxState(processedTx);
+        }
         nullifierCache?.addNullifiers(processedTx.txEffect.nullifiers.map(n => n.toBuffer()));
         result.push(processedTx);
         returns = returns.concat(returnValues);
@@ -265,6 +274,7 @@ export class PublicProcessor implements Traceable {
         totalBlockGas = totalBlockGas.add(processedTx.gasUsed.totalGas);
         totalSizeInBytes += txSize;
       } catch (err: any) {
+        await this.worldStateDB.revertCheckpoint();
         if (err?.name === 'PublicProcessorTimeoutError') {
           this.log.warn(`Stopping tx processing due to timeout.`);
           break;
@@ -321,9 +331,7 @@ export class PublicProcessor implements Traceable {
   }
 
   private async commitTxState(processedTx: ProcessedTx, txValidator?: TxValidator<ProcessedTx>): Promise<void> {
-    // Commit the state updates from this transaction
-    // TODO(palla/txs): It seems like this doesn't do anything...?
-    await this.worldStateDB.commit();
+    const treeInsertionStart = process.hrtime.bigint();
 
     // Update the state so that the next tx in the loop has the correct .startState
     // NB: before this change, all .startStates were actually incorrect, but the issue was never caught because we either:
@@ -331,7 +339,6 @@ export class PublicProcessor implements Traceable {
     // b) always had a txHandler with the same db passed to it as this.db, which updated the db in buildBaseRollupHints in this loop
     // To see how this ^ happens, move back to one shared db in test_context and run orchestrator_multi_public_functions.test.ts
     // The below is taken from buildBaseRollupHints:
-    const treeInsertionStart = process.hrtime.bigint();
     await this.db.appendLeaves(
       MerkleTreeId.NOTE_HASH_TREE,
       padArrayEnd(processedTx.txEffect.noteHashes, Fr.ZERO, MAX_NOTE_HASHES_PER_TX),
@@ -352,6 +359,7 @@ export class PublicProcessor implements Traceable {
       }
     }
 
+    // TODO: remove this?
     await this.db.sequentialInsert(
       MerkleTreeId.PUBLIC_DATA_TREE,
       processedTx.txEffect.publicDataWrites.map(x => x.toBuffer()),
@@ -419,6 +427,8 @@ export class PublicProcessor implements Traceable {
 
     const updatedBalance = balance.sub(txFee);
     await this.worldStateDB.storageWrite(feeJuiceAddress, balanceSlot, updatedBalance);
+    //const publicDataWrite = new PublicDataWrite(leafSlot, updatedBalance);
+    //await this.db.sequentialInsert(MerkleTreeId.PUBLIC_DATA_TREE, [publicDataWrite.toBuffer()]);
 
     return new PublicDataWrite(leafSlot, updatedBalance);
   }

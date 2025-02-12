@@ -1,5 +1,6 @@
 import {
   ContractClassTxL2Logs,
+  IndexedTreeId,
   MerkleTreeId,
   type MerkleTreeReadOperations,
   type MerkleTreeWriteOperations,
@@ -18,17 +19,37 @@ import {
   type NULLIFIER_TREE_HEIGHT,
   type NullifierLeafPreimage,
   type PublicDataTreeLeafPreimage,
+  PublicDataWrite,
   computePublicBytecodeCommitment,
 } from '@aztec/circuits.js';
 import { computeL1ToL2MessageNullifier, computePublicDataTreeLeafSlot } from '@aztec/circuits.js/hash';
 import { createLogger } from '@aztec/foundation/log';
 import { Timer } from '@aztec/foundation/timer';
+import { type IndexedTreeLeafPreimage, type TreeLeafPreimage } from '@aztec/foundation/trees';
 import { ContractClassRegisteredEvent } from '@aztec/protocol-contracts/class-registerer';
 import { ContractInstanceDeployedEvent } from '@aztec/protocol-contracts/instance-deployer';
+
+import { strict as assert } from 'assert';
+import cloneDeep from 'lodash.clonedeep';
 
 import { MessageLoadOracleInputs } from '../common/message_load_oracle_inputs.js';
 import { type CommitmentsDB, type PublicContractsDB, type PublicStateDB } from './db_interfaces.js';
 
+/**
+ * The preimage and the leaf index of the Low Leaf (Low Nullifier or Low Public Data Leaf)
+ */
+type PreimageWitness<T extends IndexedTreeLeafPreimage> = {
+  preimage: T;
+  leafIndex: bigint;
+};
+
+/**
+ * The result of fetching a leaf from an indexed tree. Contains the preimage and wether the leaf was already present
+ * or it's a low leaf.
+ */
+type GetLeafResult<T extends IndexedTreeLeafPreimage> = PreimageWitness<T> & {
+  alreadyPresent: boolean;
+};
 /**
  * Implements the PublicContractsDB using a ContractDataSource.
  * Progressively records contracts in transaction as they are processed in a block.
@@ -163,12 +184,29 @@ export class ContractsDataSourcePublicDB implements PublicContractsDB {
 export class WorldStateDB extends ContractsDataSourcePublicDB implements PublicStateDB, CommitmentsDB {
   private logger = createLogger('simulator:world-state-db');
 
-  private publicCommittedWriteCache: Map<bigint, Fr> = new Map();
-  private publicCheckpointedWriteCache: Map<bigint, Fr> = new Map();
-  private publicUncommittedWriteCache: Map<bigint, Fr> = new Map();
-
-  constructor(private db: MerkleTreeWriteOperations, dataSource: ContractDataSource) {
+  constructor(public db: MerkleTreeWriteOperations, dataSource: ContractDataSource) {
     super(dataSource);
+  }
+
+  /**
+   * Checkpoints the current fork state
+   */
+  public async createCheckpoint() {
+    await this.db.createCheckpoint();
+  }
+
+  /**
+   * Commits the current checkpoint
+   */
+  public async commitCheckpoint() {
+    await this.db.commitCheckpoint();
+  }
+
+  /**
+   * Reverts the current checkpoint
+   */
+  public async revertCheckpoint() {
+    await this.db.revertCheckpoint();
   }
 
   public getMerkleInterface(): MerkleTreeWriteOperations {
@@ -182,20 +220,6 @@ export class WorldStateDB extends ContractsDataSourcePublicDB implements PublicS
    * @returns The current value in the storage slot.
    */
   public async storageRead(contract: AztecAddress, slot: Fr): Promise<Fr> {
-    const leafSlot = (await computePublicDataTreeLeafSlot(contract, slot)).toBigInt();
-    const uncommitted = this.publicUncommittedWriteCache.get(leafSlot);
-    if (uncommitted !== undefined) {
-      return uncommitted;
-    }
-    const checkpointed = this.publicCheckpointedWriteCache.get(leafSlot);
-    if (checkpointed !== undefined) {
-      return checkpointed;
-    }
-    const committed = this.publicCommittedWriteCache.get(leafSlot);
-    if (committed !== undefined) {
-      return committed;
-    }
-
     return await readPublicState(this.db, contract, slot);
   }
 
@@ -206,17 +230,46 @@ export class WorldStateDB extends ContractsDataSourcePublicDB implements PublicS
    * @param newValue - The new value to store.
    * @returns The slot of the written leaf in the public data tree.
    */
-  public async storageWrite(contract: AztecAddress, slot: Fr, newValue: Fr): Promise<bigint> {
-    const index = (await computePublicDataTreeLeafSlot(contract, slot)).toBigInt();
-    this.publicUncommittedWriteCache.set(index, newValue);
-    return index;
+  public async storageWrite(contract: AztecAddress, slot: Fr, newValue: Fr): Promise<void> {
+    const leafSlot = await computePublicDataTreeLeafSlot(contract, slot);
+    const publicDataWrite = new PublicDataWrite(leafSlot, newValue);
+
+    //const treeId = MerkleTreeId.PUBLIC_DATA_TREE;
+    //const { preimage, leafIndex, alreadyPresent } = await this._getLeafOrLowLeafInfo<typeof treeId, PublicDataTreeLeafPreimage>(treeId, leafSlot);
+    //const siblingPath = await this.db.getSiblingPath(treeId, leafIndex);
+    //if (alreadyPresent) {
+    //  const updatedPreimage = cloneDeep(preimage);
+    //  updatedPreimage.value = newValue;
+
+    //}
+    await this.db.sequentialInsert(MerkleTreeId.PUBLIC_DATA_TREE, [publicDataWrite.toBuffer()]);
   }
+  //private async _getLeafOrLowLeafInfo<ID extends IndexedTreeId, T extends IndexedTreeLeafPreimage>(
+  //  treeId: ID,
+  //  key: bigint,
+  //): Promise<GetLeafResult<T>> {
+  //  // "key" is siloed slot (leafSlot) or siloed nullifier
+  //  const previousValueIndex = await this.db.getPreviousValueIndex(treeId, key);
+  //  assert(
+  //    previousValueIndex !== undefined,
+  //    `${MerkleTreeId[treeId]} low leaf index should always be found (even if target leaf does not exist)`,
+  //  );
+  //  const { index: leafIndex, alreadyPresent } = previousValueIndex;
+
+  //  const leafPreimage = await this.db.getLeafPreimage(treeId, leafIndex);
+  //  assert(
+  //    leafPreimage !== undefined,
+  //    `${MerkleTreeId[treeId]}  low leaf preimage should never be undefined (even if target leaf does not exist)`,
+  //  );
+
+  //  return { preimage: leafPreimage as T, leafIndex, alreadyPresent };
+  //}
 
   public async getNullifierMembershipWitnessAtLatestBlock(
-    nullifier: Fr,
+    siloedNullifier: Fr,
   ): Promise<NullifierMembershipWitness | undefined> {
     const timer = new Timer();
-    const index = (await this.db.findLeafIndices(MerkleTreeId.NULLIFIER_TREE, [nullifier.toBuffer()]))[0];
+    const index = (await this.db.findLeafIndices(MerkleTreeId.NULLIFIER_TREE, [siloedNullifier.toBuffer()]))[0];
     if (!index) {
       return undefined;
     }
@@ -317,44 +370,6 @@ export class WorldStateDB extends ContractsDataSourcePublicDB implements PublicS
       operation: 'get-nullifier-index',
     } satisfies PublicDBAccessStats);
     return index;
-  }
-
-  /**
-   * Commit the pending public changes to the DB.
-   * @returns Nothing.
-   */
-  commit(): Promise<void> {
-    for (const [k, v] of this.publicCheckpointedWriteCache) {
-      this.publicCommittedWriteCache.set(k, v);
-    }
-    // uncommitted writes take precedence over checkpointed writes
-    // since they are the most recent
-    for (const [k, v] of this.publicUncommittedWriteCache) {
-      this.publicCommittedWriteCache.set(k, v);
-    }
-    return this.rollbackToCommit();
-  }
-
-  /**
-   * Rollback the pending public changes.
-   * @returns Nothing.
-   */
-  async rollbackToCommit(): Promise<void> {
-    await this.rollbackToCheckpoint();
-    this.publicCheckpointedWriteCache = new Map<bigint, Fr>();
-    return Promise.resolve();
-  }
-
-  checkpoint(): Promise<void> {
-    for (const [k, v] of this.publicUncommittedWriteCache) {
-      this.publicCheckpointedWriteCache.set(k, v);
-    }
-    return this.rollbackToCheckpoint();
-  }
-
-  rollbackToCheckpoint(): Promise<void> {
-    this.publicUncommittedWriteCache = new Map<bigint, Fr>();
-    return Promise.resolve();
   }
 }
 
