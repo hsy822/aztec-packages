@@ -2,16 +2,16 @@ import { Fr } from '@aztec/foundation/fields';
 
 import { type MockProxy, mock } from 'jest-mock-extended';
 
-import { type CommitmentsDB } from '../../server.js';
+import { type WorldStateDB } from '../../server.js';
 import { NullifierManager } from './nullifiers.js';
 
 describe('avm nullifier caching', () => {
-  let commitmentsDb: MockProxy<CommitmentsDB>;
+  let commitmentsDB: MockProxy<WorldStateDB>;
   let nullifiers: NullifierManager;
 
   beforeEach(() => {
-    commitmentsDb = mock<CommitmentsDB>();
-    nullifiers = new NullifierManager(commitmentsDb);
+    commitmentsDB = mock<WorldStateDB>();
+    nullifiers = new NullifierManager(commitmentsDB);
   });
 
   describe('Nullifier caching and existence checks', () => {
@@ -39,7 +39,7 @@ describe('avm nullifier caching', () => {
       const nullifier = new Fr(2);
       const storedLeafIndex = BigInt(420);
 
-      commitmentsDb.getNullifierIndex.mockResolvedValue(storedLeafIndex);
+      commitmentsDB.getNullifierIndex.mockResolvedValue(storedLeafIndex);
 
       const [exists, isPending, gotIndex] = await nullifiers.checkExists(nullifier);
       // exists (in host), not pending, tree index retrieved from host
@@ -103,7 +103,7 @@ describe('avm nullifier caching', () => {
       const storedLeafIndex = BigInt(420);
 
       // Nullifier exists in host
-      commitmentsDb.getNullifierIndex.mockResolvedValue(storedLeafIndex);
+      commitmentsDB.getNullifierIndex.mockResolvedValue(storedLeafIndex);
       // Can't append to cache
       await expect(nullifiers.append(nullifier)).rejects.toThrow(
         `Siloed nullifier ${nullifier} already exists in parent cache or host.`,
@@ -139,7 +139,7 @@ describe('avm nullifier caching', () => {
       await nullifiers.append(nullifier);
 
       // Create child cache, don't derive from parent so we can concoct a collision on merge
-      const childNullifiers = new NullifierManager(commitmentsDb);
+      const childNullifiers = new NullifierManager(commitmentsDB);
       // Append a nullifier to child
       await childNullifiers.append(nullifier);
 

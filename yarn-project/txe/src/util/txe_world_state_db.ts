@@ -37,17 +37,4 @@ export class TXEWorldStateDB extends WorldStateDB {
       new PublicDataWrite(await computePublicDataTreeLeafSlot(contract, slot), newValue),
     ]);
   }
-
-  override checkpoint(): Promise<void> {
-    return Promise.resolve();
-  }
-  override rollbackToCheckpoint(): Promise<void> {
-    throw new Error('Cannot rollback');
-  }
-  override commit(): Promise<void> {
-    return Promise.resolve();
-  }
-  override rollbackToCommit(): Promise<void> {
-    throw new Error('Cannot rollback');
-  }
 }
