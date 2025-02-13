@@ -18,22 +18,20 @@ describe('avm nullifier caching', () => {
     it('Reading a non-existent nullifier works (gets zero & DNE)', async () => {
       const nullifier = new Fr(2);
       // never written!
-      const [exists, isPending, gotIndex] = await nullifiers.checkExists(nullifier);
+      const { exists, cacheHit } = await nullifiers.checkExists(nullifier);
       // doesn't exist, not pending, index is zero (non-existent)
       expect(exists).toEqual(false);
-      expect(isPending).toEqual(false);
-      expect(gotIndex).toEqual(Fr.ZERO);
+      expect(cacheHit).toEqual(false);
     });
     it('Should cache nullifier, existence check works after creation', async () => {
       const nullifier = new Fr(2);
 
       // Write to cache
       await nullifiers.append(nullifier);
-      const [exists, isPending, gotIndex] = await nullifiers.checkExists(nullifier);
-      // exists (in cache), isPending, index is zero (not in tree)
+      const { exists, cacheHit } = await nullifiers.checkExists(nullifier);
+      // exists (in cache), cacheHit, index is zero (not in tree)
       expect(exists).toEqual(true);
-      expect(isPending).toEqual(true);
-      expect(gotIndex).toEqual(Fr.ZERO);
+      expect(cacheHit).toEqual(true);
     });
     it('Existence check works on fallback to host (gets index, exists, not-pending)', async () => {
       const nullifier = new Fr(2);
@@ -41,11 +39,10 @@ describe('avm nullifier caching', () => {
 
       commitmentsDB.getNullifierIndex.mockResolvedValue(storedLeafIndex);
 
-      const [exists, isPending, gotIndex] = await nullifiers.checkExists(nullifier);
+      const { exists, cacheHit } = await nullifiers.checkExists(nullifier);
       // exists (in host), not pending, tree index retrieved from host
       expect(exists).toEqual(true);
-      expect(isPending).toEqual(false);
-      expect(gotIndex).toEqual(gotIndex);
+      expect(cacheHit).toEqual(false);
     });
     it('Existence check works on fallback to parent (gets value, exists, is pending)', async () => {
       const nullifier = new Fr(2);
@@ -54,11 +51,10 @@ describe('avm nullifier caching', () => {
       // Write to parent cache
       await nullifiers.append(nullifier);
       // Get from child cache
-      const [exists, isPending, gotIndex] = await childNullifiers.checkExists(nullifier);
-      // exists (in parent), isPending, index is zero (not in tree)
+      const { exists, cacheHit } = await childNullifiers.checkExists(nullifier);
+      // exists (in parent), cacheHit, index is zero (not in tree)
       expect(exists).toEqual(true);
-      expect(isPending).toEqual(true);
-      expect(gotIndex).toEqual(Fr.ZERO);
+      expect(cacheHit).toEqual(true);
     });
     it('Existence check works on fallback to grandparent (gets value, exists, is pending)', async () => {
       const nullifier = new Fr(2);
@@ -68,11 +64,10 @@ describe('avm nullifier caching', () => {
       // Write to parent cache
       await nullifiers.append(nullifier);
       // Get from child cache
-      const [exists, isPending, gotIndex] = await grandChildNullifiers.checkExists(nullifier);
-      // exists (in parent), isPending, index is zero (not in tree)
+      const { exists, cacheHit } = await grandChildNullifiers.checkExists(nullifier);
+      // exists (in parent), cacheHit, index is zero (not in tree)
       expect(exists).toEqual(true);
-      expect(isPending).toEqual(true);
-      expect(gotIndex).toEqual(Fr.ZERO);
+      expect(cacheHit).toEqual(true);
     });
   });
 
@@ -128,9 +123,9 @@ describe('avm nullifier caching', () => {
 
       // After merge, parent has both nullifiers
       const results0 = await nullifiers.checkExists(nullifier0);
-      expect(results0).toEqual([/*exists=*/ true, /*isPending=*/ true, /*leafIndex=*/ Fr.ZERO]);
+      expect(results0).toEqual({ exists: true, cacheHit: true });
       const results1 = await nullifiers.checkExists(nullifier1);
-      expect(results1).toEqual([/*exists=*/ true, /*isPending=*/ true, /*leafIndex=*/ Fr.ZERO]);
+      expect(results1).toEqual({ exists: true, cacheHit: true });
     });
     it('Cant merge two nullifier caches with colliding entries', async () => {
       const nullifier = new Fr(2);

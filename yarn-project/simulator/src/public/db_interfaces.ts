@@ -36,14 +36,6 @@ export interface PublicStateDB {
  */
 export interface PublicContractsDB {
   /**
-   * Returns the brillig (public bytecode) of a function.
-   * @param address - The contract address that owns this function.
-   * @param selector - The selector for the function.
-   * @returns The bytecode or undefined if not found.
-   */
-  getBytecode(address: AztecAddress, selector: FunctionSelector): Promise<Buffer | undefined>;
-
-  /**
    * Returns a publicly deployed contract instance.
    * @param address - Address of the contract.
    * @returns The contract instance or undefined if not found.

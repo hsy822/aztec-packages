@@ -70,6 +70,8 @@ export class PublicTxSimulator {
    * @returns The result of the transaction's public execution.
    */
   public async simulate(tx: Tx): Promise<PublicTxResult> {
+    const startTime = performance.now();
+
     const txHash = await tx.getTxHash();
     this.log.debug(`Simulating ${tx.enqueuedPublicFunctionCalls.length} public calls for tx ${txHash}`, { txHash });
 
@@ -132,6 +134,8 @@ export class PublicTxSimulator {
       tx.filterRevertedLogs(tx.data.forPublic!.nonRevertibleAccumulatedData);
     }
 
+    const endTime = performance.now();
+    this.log.error(`Public tx simulation for ${txHash} took ${endTime - startTime}ms`);
     return {
       avmProvingRequest,
       gasUsed: {

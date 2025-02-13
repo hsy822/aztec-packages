@@ -94,6 +94,7 @@ import {
   type HashedValuesCache,
   type PublicTxResult,
   PublicTxSimulator,
+  WorldStateDB,
   createSimulationError,
   resolveAssertionMessageFromError,
 } from '@aztec/simulator/server';
@@ -102,7 +103,6 @@ import { type NativeWorldStateService } from '@aztec/world-state';
 import { TXENode } from '../node/txe_node.js';
 import { type TXEDatabase } from '../util/txe_database.js';
 import { TXEPublicContractDataSource } from '../util/txe_public_contract_data_source.js';
-import { TXEWorldStateDB } from '../util/txe_world_state_db.js';
 
 export class TXE implements TypedOracle {
   private blockNumber = 1;
@@ -893,7 +893,7 @@ export class TXE implements TypedOracle {
 
     const simulator = new PublicTxSimulator(
       db,
-      new TXEWorldStateDB(db, new TXEPublicContractDataSource(this), this),
+      new WorldStateDB(db, new TXEPublicContractDataSource(this)),
       globalVariables,
     );
 

@@ -3,9 +3,13 @@ import { type ZodFor } from '@aztec/foundation/schemas';
 import { z } from 'zod';
 
 import { type ProcessedTx } from '../processed_tx.js';
-import { type Tx } from '../tx.js';
+import { Tx } from '../tx.js';
 
 export type AnyTx = Tx | ProcessedTx;
+
+export function hasPublicCalls(tx: AnyTx): boolean {
+  return tx.data.numberOfPublicCallRequests() > 0;
+}
 
 export type TxValidationResult =
   | { result: 'valid' }

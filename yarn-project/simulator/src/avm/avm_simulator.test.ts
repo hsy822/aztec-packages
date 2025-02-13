@@ -1235,7 +1235,7 @@ describe('AVM simulator: transpiled Noir contracts', () => {
 
         const {
           preimage: lowLeafPreimage,
-          leafIndex: lowLeafIndex,
+          leafOrLowLeafIndex: lowLeafIndex,
           alreadyPresent: leafAlreadyPresent,
         } = await persistableState.getLeafOrLowLeafInfo<MerkleTreeId.NULLIFIER_TREE, NullifierLeafPreimage>(
           MerkleTreeId.NULLIFIER_TREE,
@@ -1266,7 +1266,7 @@ describe('AVM simulator: transpiled Noir contracts', () => {
 
         const {
           preimage: lowLeafPreimage,
-          leafIndex: lowLeafIndex,
+          leafOrLowLeafIndex: lowLeafIndex,
           alreadyPresent: leafAlreadyPresent,
         } = await persistableState.getLeafOrLowLeafInfo<MerkleTreeId.NULLIFIER_TREE, NullifierLeafPreimage>(
           MerkleTreeId.NULLIFIER_TREE,
@@ -1299,7 +1299,7 @@ describe('AVM simulator: transpiled Noir contracts', () => {
 
         const {
           preimage: leafPreimage,
-          leafIndex,
+          leafOrLowLeafIndex: leafIndex,
           alreadyPresent: leafAlreadyPresent,
         } = await persistableState.getLeafOrLowLeafInfo<MerkleTreeId.NULLIFIER_TREE, NullifierLeafPreimage>(
           MerkleTreeId.NULLIFIER_TREE,
@@ -1332,7 +1332,7 @@ describe('AVM simulator: transpiled Noir contracts', () => {
         const calldata = [value0];
         const {
           preimage: lowLeafPreimage,
-          leafIndex: lowLeafIndex,
+          leafOrLowLeafIndex: lowLeafIndex,
           alreadyPresent: leafAlreadyPresent,
         } = await persistableState.getLeafOrLowLeafInfo<MerkleTreeId.PUBLIC_DATA_TREE, PublicDataTreeLeafPreimage>(
           MerkleTreeId.PUBLIC_DATA_TREE,
@@ -1378,7 +1378,7 @@ describe('AVM simulator: transpiled Noir contracts', () => {
 
         const {
           preimage: lowLeafPreimage,
-          leafIndex: lowLeafIndex,
+          leafOrLowLeafIndex: lowLeafIndex,
           alreadyPresent: leafAlreadyPresent,
         } = await persistableState.getLeafOrLowLeafInfo<MerkleTreeId.PUBLIC_DATA_TREE, PublicDataTreeLeafPreimage>(
           MerkleTreeId.PUBLIC_DATA_TREE,
@@ -1413,7 +1413,7 @@ describe('AVM simulator: transpiled Noir contracts', () => {
         const publicDataWrite = new PublicDataWrite(leafSlot0, value0);
         await merkleTrees.sequentialInsert(MerkleTreeId.PUBLIC_DATA_TREE, [publicDataWrite.toBuffer()]);
 
-        const { preimage: leafPreimage, leafIndex } = await persistableState.getLeafOrLowLeafInfo<
+        const { preimage: leafPreimage, leafOrLowLeafIndex: leafIndex } = await persistableState.getLeafOrLowLeafInfo<
           MerkleTreeId.PUBLIC_DATA_TREE,
           PublicDataTreeLeafPreimage
         >(MerkleTreeId.PUBLIC_DATA_TREE, leafSlot0.toBigInt());
@@ -1446,7 +1446,7 @@ describe('AVM simulator: transpiled Noir contracts', () => {
 
         const {
           preimage: lowLeafPreimage,
-          leafIndex: lowLeafIndex,
+          leafOrLowLeafIndex: lowLeafIndex,
           alreadyPresent: leafAlreadyPresent,
         } = await persistableState.getLeafOrLowLeafInfo<MerkleTreeId.PUBLIC_DATA_TREE, PublicDataTreeLeafPreimage>(
           MerkleTreeId.PUBLIC_DATA_TREE,
@@ -1471,7 +1471,7 @@ describe('AVM simulator: transpiled Noir contracts', () => {
         expect(results.reverted).toBe(false);
         expect(results.output).toEqual([value0]);
 
-        const { preimage: leafPreimage, leafIndex } = await persistableState.getLeafOrLowLeafInfo<
+        const { preimage: leafPreimage, leafOrLowLeafIndex: leafIndex } = await persistableState.getLeafOrLowLeafInfo<
           MerkleTreeId.PUBLIC_DATA_TREE,
           PublicDataTreeLeafPreimage
         >(MerkleTreeId.PUBLIC_DATA_TREE, leafSlot0.toBigInt());
