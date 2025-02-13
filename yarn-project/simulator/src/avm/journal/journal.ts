@@ -86,6 +86,7 @@ export class AvmPersistableStateManager {
     public merkleTrees: AvmEphemeralForest,
     public readonly firstNullifier: Fr,
   ) {
+    // TODO(dbanks12): this is a shortcut for now
     this.db = worldStateDB.getMerkleInterface();
   }
 
@@ -240,12 +241,12 @@ export class AvmPersistableStateManager {
    * @returns the latest value written to slot, or 0 if never written to before
    */
   public async readStorage(contractAddress: AztecAddress, slot: Fr): Promise<Fr> {
-    const leafSlot = await computePublicDataTreeLeafSlot(contractAddress, slot);
-    this.log.trace(`Storage read  (address=${contractAddress}, slot=${slot}, leafSlot=${leafSlot})`);
+    this.log.trace(`Storage read (address=${contractAddress}, slot=${slot})`);
 
     let value = Fr.zero();
 
     if (this.doMerkleOperations) {
+      const leafSlot = await computePublicDataTreeLeafSlot(contractAddress, slot);
       const treeId = MerkleTreeId.PUBLIC_DATA_TREE;
       // Get leaf if present, low leaf if absent
       // If leaf is present, hint/trace it. Otherwise, hint/trace the low leaf.
@@ -288,7 +289,7 @@ export class AvmPersistableStateManager {
       const read = await this.publicStorage.read(contractAddress, slot);
       value = read.value;
       this.log.trace(
-        `Storage read results (address=${contractAddress}, slot=${slot}, leafSlot=${leafSlot}): value=${read.value}, cached=${read.cached}`,
+        `Storage read results (address=${contractAddress}, slot=${slot}): value=${read.value}, cached=${read.cached}`,
       );
       this.trace.tracePublicStorageRead(contractAddress, slot, value);
     }
@@ -489,18 +490,7 @@ export class AvmPersistableStateManager {
           `Siloed nullifier ${siloedNullifier} already exists in parent cache or host.`,
         );
       } else {
-        // We append the new nullifier
-        //this.log.trace(
-        //  `Nullifier tree root before insertion ${new Fr(
-        //    (await this.db.getTreeInfo(treeId)).root,
-        //  )}`,
-        //);
         const appendResult = await this.db.sequentialInsert(treeId, [siloedNullifier.toBuffer()]);
-        //this.log.trace(
-        //  `Nullifier tree root after insertion ${new Fr(
-        //    (await this.db.getTreeInfo(treeId)).root,
-        //  )}`,
-        //);
         const lowLeafWitnessData = appendResult.lowLeavesWitnessData![0];
         const lowLeafPreimage = lowLeafWitnessData.leafPreimage as NullifierLeafPreimage;
         const lowLeafIndex = lowLeafWitnessData.index;

@@ -135,7 +135,7 @@ export class PublicTxSimulator {
     }
 
     const endTime = performance.now();
-    this.log.error(`Public tx simulation for ${txHash} took ${endTime - startTime}ms`);
+    this.log.verbose(`Public tx simulation for ${txHash} took ${endTime - startTime}ms`);
     return {
       avmProvingRequest,
       gasUsed: {
