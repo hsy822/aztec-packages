@@ -247,7 +247,6 @@ export class PublicProcessor implements Traceable {
           // TODO(palla/txs): Can we get into this case? AVM validates this. We should be able to remove it.
           const result = await postprocessValidator.validateTx(processedTx);
           if (result.result !== 'valid') {
-            // TODO: revert checkpoint here?
             const reason = result.reason.join(', ');
             this.log.error(`Rejecting tx ${processedTx.hash} after processing: ${reason}.`);
             failed.push({ tx, error: new Error(`Tx failed post-process validation: ${reason}`) });
@@ -359,7 +358,7 @@ export class PublicProcessor implements Traceable {
       }
     }
 
-    // TODO: remove this?
+    // The only public data write should be for fee payment
     await this.db.sequentialInsert(
       MerkleTreeId.PUBLIC_DATA_TREE,
       processedTx.txEffect.publicDataWrites.map(x => x.toBuffer()),
@@ -427,8 +426,6 @@ export class PublicProcessor implements Traceable {
 
     const updatedBalance = balance.sub(txFee);
     await this.worldStateDB.storageWrite(feeJuiceAddress, balanceSlot, updatedBalance);
-    //const publicDataWrite = new PublicDataWrite(leafSlot, updatedBalance);
-    //await this.db.sequentialInsert(MerkleTreeId.PUBLIC_DATA_TREE, [publicDataWrite.toBuffer()]);
 
     return new PublicDataWrite(leafSlot, updatedBalance);
   }

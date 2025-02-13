@@ -6,12 +6,12 @@ import { type WorldStateDB } from '../../server.js';
 import { NullifierManager } from './nullifiers.js';
 
 describe('avm nullifier caching', () => {
-  let commitmentsDB: MockProxy<WorldStateDB>;
+  let worldStateDB: MockProxy<WorldStateDB>;
   let nullifiers: NullifierManager;
 
   beforeEach(() => {
-    commitmentsDB = mock<WorldStateDB>();
-    nullifiers = new NullifierManager(commitmentsDB);
+    worldStateDB = mock<WorldStateDB>();
+    nullifiers = new NullifierManager(worldStateDB);
   });
 
   describe('Nullifier caching and existence checks', () => {
@@ -37,7 +37,7 @@ describe('avm nullifier caching', () => {
       const nullifier = new Fr(2);
       const storedLeafIndex = BigInt(420);
 
-      commitmentsDB.getNullifierIndex.mockResolvedValue(storedLeafIndex);
+      worldStateDB.getNullifierIndex.mockResolvedValue(storedLeafIndex);
 
       const { exists, cacheHit } = await nullifiers.checkExists(nullifier);
       // exists (in host), not pending, tree index retrieved from host
@@ -98,7 +98,7 @@ describe('avm nullifier caching', () => {
       const storedLeafIndex = BigInt(420);
 
       // Nullifier exists in host
-      commitmentsDB.getNullifierIndex.mockResolvedValue(storedLeafIndex);
+      worldStateDB.getNullifierIndex.mockResolvedValue(storedLeafIndex);
       // Can't append to cache
       await expect(nullifiers.append(nullifier)).rejects.toThrow(
         `Siloed nullifier ${nullifier} already exists in parent cache or host.`,
@@ -134,7 +134,7 @@ describe('avm nullifier caching', () => {
       await nullifiers.append(nullifier);
 
       // Create child cache, don't derive from parent so we can concoct a collision on merge
-      const childNullifiers = new NullifierManager(commitmentsDB);
+      const childNullifiers = new NullifierManager(worldStateDB);
       // Append a nullifier to child
       await childNullifiers.append(nullifier);
 

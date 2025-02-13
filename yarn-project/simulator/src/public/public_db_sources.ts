@@ -23,6 +23,8 @@ import { Timer } from '@aztec/foundation/timer';
 import { ContractClassRegisteredEvent } from '@aztec/protocol-contracts/class-registerer';
 import { ContractInstanceDeployedEvent } from '@aztec/protocol-contracts/instance-deployer';
 
+import { type PublicStateDB } from './db_interfaces.js';
+
 /**
  * Implements the PublicContractsDB using a ContractDataSource.
  * Progressively records contracts in transaction as they are processed in a block.
@@ -142,7 +144,7 @@ export class ContractsDataSourcePublicDB {
 /**
  * A public state DB that reads and writes to the world state.
  */
-export class WorldStateDB extends ContractsDataSourcePublicDB {
+export class WorldStateDB extends ContractsDataSourcePublicDB implements PublicStateDB {
   private logger = createLogger('simulator:world-state-db');
 
   constructor(public db: MerkleTreeWriteOperations, dataSource: ContractDataSource) {

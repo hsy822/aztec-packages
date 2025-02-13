@@ -326,10 +326,6 @@ export class PublicTxContext {
    */
   private async generateAvmCircuitPublicInputs(endStateReference: StateReference): Promise<AvmCircuitPublicInputs> {
     assert(this.halted, 'Can only get AvmCircuitPublicInputs after tx execution ends');
-    //const ephemeralTrees = this.state.getActiveStateManager().merkleTrees;
-    //const noteHashTree = await ephemeralTrees.getTreeSnapshot(MerkleTreeId.NOTE_HASH_TREE);
-    //const nullifierTree = await ephemeralTrees.getTreeSnapshot(MerkleTreeId.NULLIFIER_TREE);
-    //const publicDataTree = await ephemeralTrees.getTreeSnapshot(MerkleTreeId.PUBLIC_DATA_TREE);
 
     const stateManager = this.state.getActiveStateManager();
     const noteHashTreeInfo = await stateManager.getTreeInfo(MerkleTreeId.NOTE_HASH_TREE);
