@@ -811,7 +811,7 @@ export async function createAndSyncProverNode(
     },
     { prefilledPublicData },
   );
-  proverNode.start();
+  await proverNode.start();
   return proverNode;
 }
 
