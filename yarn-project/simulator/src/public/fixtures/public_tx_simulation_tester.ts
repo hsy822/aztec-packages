@@ -13,9 +13,6 @@ import { WorldStateDB } from '../public_db_sources.js';
 import { type PublicTxResult, PublicTxSimulator } from '../public_tx_simulator.js';
 import { createTxForPublicCalls } from './index.js';
 
-const TIMESTAMP = new Fr(99833);
-const DEFAULT_GAS_FEES = new GasFees(2, 3);
-
 export type TestEnqueuedCall = {
   address: AztecAddress;
   fnName: string;
@@ -35,31 +32,26 @@ export class PublicTxSimulationTester extends BaseAvmSimulationTester {
     private worldStateDB: WorldStateDB,
     contractDataSource: SimpleContractDataSource,
     merkleTrees: MerkleTreeWriteOperations,
-    skipContractDeployments: boolean,
   ) {
-    super(contractDataSource, merkleTrees, skipContractDeployments);
+    super(contractDataSource, merkleTrees);
   }
 
-  public static async create(skipContractDeployments = false): Promise<PublicTxSimulationTester> {
+  public static async create(): Promise<PublicTxSimulationTester> {
     const contractDataSource = new SimpleContractDataSource();
     const merkleTrees = await (await NativeWorldStateService.tmp()).fork();
     const worldStateDB = new WorldStateDB(merkleTrees, contractDataSource);
-    return new PublicTxSimulationTester(worldStateDB, contractDataSource, merkleTrees, skipContractDeployments);
+    return new PublicTxSimulationTester(worldStateDB, contractDataSource, merkleTrees);
   }
 
-  public async simulateTx(
+  public async createTx(
     sender: AztecAddress,
     setupCalls: TestEnqueuedCall[] = [],
     appCalls: TestEnqueuedCall[] = [],
     teardownCall?: TestEnqueuedCall,
     feePayer: AztecAddress = AztecAddress.zero(),
-  ): Promise<PublicTxResult> {
-    const globals = GlobalVariables.empty();
-    globals.timestamp = TIMESTAMP;
-    globals.gasFees = DEFAULT_GAS_FEES;
-
-    const simulator = new PublicTxSimulator(this.merkleTrees, this.worldStateDB, globals, /*doMerkleOperations=*/ true);
-
+    /* need some unique first nullifier for note-nonce computations */
+    firstNullifier = new Fr(420000 + this.txCount++),
+  ): Promise<Tx> {
     const setupExecutionRequests: PublicExecutionRequest[] = [];
     for (let i = 0; i < setupCalls.length; i++) {
       const address = setupCalls[i].address;
@@ -103,17 +95,28 @@ export class PublicTxSimulationTester extends BaseAvmSimulationTester {
       );
     }
 
-    // Use a fake "first nullifier" to make sure note hash nonces are computed properly,
-    // but make sure each tx has a unique first nullifier.
-    const firstNullifier = new Fr(420000 + this.txCount++);
-
-    const tx: Tx = await createTxForPublicCalls(
+    return await createTxForPublicCalls(
       firstNullifier,
       setupExecutionRequests,
       appExecutionRequests,
       teardownExecutionRequest,
       feePayer,
     );
+  }
+
+  public async simulateTx(
+    sender: AztecAddress,
+    setupCalls: TestEnqueuedCall[] = [],
+    appCalls: TestEnqueuedCall[] = [],
+    teardownCall?: TestEnqueuedCall,
+    feePayer: AztecAddress = AztecAddress.zero(),
+    /* need some unique first nullifier for note-nonce computations */
+    firstNullifier = new Fr(420000 + this.txCount++),
+    globals = defaultGlobals(),
+  ): Promise<PublicTxResult> {
+    const tx = await this.createTx(sender, setupCalls, appCalls, teardownCall, feePayer, firstNullifier);
+
+    const simulator = new PublicTxSimulator(this.merkleTrees, this.worldStateDB, globals, /*doMerkleOperations=*/ true);
 
     const startTime = performance.now();
     const avmResult = await simulator.simulate(tx);
@@ -144,4 +147,11 @@ async function executionRequestForCall(
     isStaticCall,
   );
   return new PublicExecutionRequest(callContext, calldata);
+}
+
+function defaultGlobals() {
+  const globals = GlobalVariables.empty();
+  // apply some nonzero default gas fees
+  globals.gasFees = new GasFees(2, 3);
+  return globals;
 }
