@@ -1,3 +1,4 @@
+import { CheatCodes } from '@aztec/aztec.js';
 import { type ContractArtifact, type FunctionArtifact, loadContractArtifact } from '@aztec/aztec.js/abi';
 import { type PXE } from '@aztec/circuit-types';
 import { type DeployL1Contracts, type L1ContractsConfig } from '@aztec/ethereum';
@@ -85,21 +86,6 @@ export async function deployAztecContracts(
     },
     config,
   );
-}
-
-/** Sets the assumed proven block number on the rollup contract on L1 */
-export async function setAssumeProvenThrough(
-  blockNumber: number,
-  rollupAddress: EthAddress,
-  walletClient: WalletClient<HttpTransport, Chain, Account>,
-) {
-  const rollup = getContract({
-    address: getAddress(rollupAddress.toString()),
-    abi: RollupAbi,
-    client: walletClient,
-  });
-  const hash = await rollup.write.setAssumeProvenThroughBlockNumber([BigInt(blockNumber)]);
-  await walletClient.extend(publicActions).waitForTransactionReceipt({ hash });
 }
 
 /**
