@@ -5,21 +5,18 @@ import {
   type AztecAddress,
   MINIMUM_UPDATE_DELAY,
   PublicDataTreeLeaf,
+  SHARED_MUTABLE_VALUES_LEN,
   ScheduledDelayChange,
   ScheduledValueChange,
+  SharedMutableValues,
   UPDATED_CLASS_IDS_SLOT,
-  UPDATES_SCHEDULED_VALUE_CHANGE_LEN,
-  computeSharedMutableHashSlot,
   deriveSigningKey,
   getContractInstanceFromDeployParams,
 } from '@aztec/circuits.js';
 import { computePublicDataTreeLeafSlot, deriveStorageSlotInMap } from '@aztec/circuits.js/hash';
-import { poseidon2Hash } from '@aztec/foundation/crypto';
 import { UpdatableContract } from '@aztec/noir-contracts.js/Updatable';
 import { UpdatedContract, UpdatedContractArtifact } from '@aztec/noir-contracts.js/Updated';
 import { ProtocolContractAddress } from '@aztec/protocol-contracts';
-
-import { setup } from './fixtures/utils.js';
 
 // Set the update delay in genesis data so it's feasible to test in an e2e test
 const DEFAULT_TEST_UPDATE_DELAY = 10;
@@ -49,16 +46,16 @@ describe('e2e_contract_updates', () => {
         ),
       );
     };
+
     const valueChange = ScheduledValueChange.empty(1);
     const delayChange = new ScheduledDelayChange(undefined, 0, DEFAULT_TEST_UPDATE_DELAY);
-    await valueChange.writeToTree(sharedMutableSlot, writeToTree);
-    await delayChange.writeToTree(sharedMutableSlot, writeToTree);
+    const sharedMutableValues = new SharedMutableValues(valueChange, delayChange);
 
-    const updatePreimage = [delayChange.toField(), ...valueChange.toFields()];
-    const updateHash = await poseidon2Hash(updatePreimage);
+    await sharedMutableValues.writeToTree(sharedMutableSlot, writeToTree);
 
-    const hashSlot = computeSharedMutableHashSlot(sharedMutableSlot, UPDATES_SCHEDULED_VALUE_CHANGE_LEN);
+    const updateHash = await sharedMutableValues.hash();
 
+    const hashSlot = sharedMutableSlot.add(new Fr(SHARED_MUTABLE_VALUES_LEN));
     await writeToTree(hashSlot, updateHash);
 
     return leaves;

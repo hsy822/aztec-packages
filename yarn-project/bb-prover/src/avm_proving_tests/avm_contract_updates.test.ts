@@ -4,15 +4,14 @@ import {
   type ContractInstanceWithAddress,
   FunctionSelector,
   PUBLIC_DISPATCH_SELECTOR,
+  SHARED_MUTABLE_VALUES_LEN,
   ScheduledDelayChange,
   ScheduledValueChange,
+  SharedMutableValues,
   UPDATED_CLASS_IDS_SLOT,
-  UPDATES_SCHEDULED_VALUE_CHANGE_LEN,
-  computeSharedMutableHashSlot,
 } from '@aztec/circuits.js';
 import { deriveStorageSlotInMap } from '@aztec/circuits.js/hash';
 import { makeContractClassPublic, makeContractInstanceFromClassId } from '@aztec/circuits.js/testing';
-import { poseidon2Hash } from '@aztec/foundation/crypto';
 import { Fr } from '@aztec/foundation/fields';
 import { AvmTestContractArtifact } from '@aztec/noir-contracts.js/AvmTest';
 import { ProtocolContractAddress } from '@aztec/protocol-contracts';
@@ -50,17 +49,17 @@ describe('AVM WitGen & Circuit - contract updates', () => {
 
     const valueChange = new ScheduledValueChange([previousClassId], [nextClassId], blockOfChange);
     const delayChange = ScheduledDelayChange.empty();
+    const sharedMutableValues = new SharedMutableValues(valueChange, delayChange);
+
     const writeToTree = async (storageSlot: Fr, value: Fr) => {
       await tester.setPublicStorage(ProtocolContractAddress.ContractInstanceDeployer, storageSlot, value);
     };
-    await valueChange.writeToTree(sharedMutableSlot, writeToTree);
-    await delayChange.writeToTree(sharedMutableSlot, writeToTree);
 
-    const updatePreimage = [delayChange.toField(), ...valueChange.toFields()];
-    const updateHash = await poseidon2Hash(updatePreimage);
+    await sharedMutableValues.writeToTree(sharedMutableSlot, writeToTree);
 
-    const hashSlot = computeSharedMutableHashSlot(sharedMutableSlot, UPDATES_SCHEDULED_VALUE_CHANGE_LEN);
+    const updateHash = await sharedMutableValues.hash();
 
+    const hashSlot = sharedMutableSlot.add(new Fr(SHARED_MUTABLE_VALUES_LEN));
     await writeToTree(hashSlot, updateHash);
   };
 
