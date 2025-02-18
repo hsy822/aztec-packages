@@ -8,20 +8,17 @@ import {
   EpochRewards,
   SubEpochRewards
 } from "@aztec/core/interfaces/IRollup.sol";
-
-import {STFLib, RollupStore} from "@aztec/core/libraries/RollupLibs/core/STFLib.sol";
-import {Timestamp, Slot, Epoch, TimeLib} from "@aztec/core/libraries/TimeLib.sol";
-import {Errors} from "@aztec/core/libraries/Errors.sol";
-import {FeeHeader} from "@aztec/core/libraries/RollupLibs/FeeMath.sol";
-
-import {Math} from "@oz/utils/math/Math.sol";
-
 import {RollupStore, SubmitEpochRootProofArgs} from "@aztec/core/interfaces/IRollup.sol";
 import {Constants} from "@aztec/core/libraries/ConstantsGen.sol";
 import {Errors} from "@aztec/core/libraries/Errors.sol";
+import {Errors} from "@aztec/core/libraries/Errors.sol";
+import {STFLib, RollupStore} from "@aztec/core/libraries/RollupLibs/core/STFLib.sol";
+import {FeeHeader} from "@aztec/core/libraries/RollupLibs/FeeMath.sol";
+import {Timestamp, Slot, Epoch, TimeLib} from "@aztec/core/libraries/TimeLib.sol";
 import {Epoch} from "@aztec/core/libraries/TimeLib.sol";
 import {IERC20} from "@oz/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@oz/token/ERC20/utils/SafeERC20.sol";
+import {Math} from "@oz/utils/math/Math.sol";
 
 library EpochProofLib {
   using SafeERC20 for IERC20;
