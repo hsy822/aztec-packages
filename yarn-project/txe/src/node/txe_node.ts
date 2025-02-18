@@ -24,6 +24,7 @@ import {
   TxReceipt,
   TxScopedL2Log,
   type TxValidationResult,
+  type WorldStateSyncStatus,
 } from '@aztec/circuit-types';
 import {
   type ARCHIVE_HEIGHT,
@@ -716,5 +717,12 @@ export class TXENode implements AztecNode {
    */
   getNodeInfo(): Promise<NodeInfo> {
     throw new Error('TXE Node method getNodeInfo not implemented');
+  }
+
+  /**
+   * Returns the sync status of the node's world state
+   */
+  getWorldStateSyncStatus(): Promise<WorldStateSyncStatus> {
+    throw new Error('TXE Node method getWorldStateSyncStatus not implemented');
   }
 }
